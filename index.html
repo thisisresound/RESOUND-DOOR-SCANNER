@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FxW – Main Door Check-In</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#A9D1EA;
+  --blue-dim:rgba(169,209,234,.1);
+  --blue-border:rgba(169,209,234,.25);
+  --peach:#F4B8B8;
+  --green:#4ade80;
+  --yellow:#facc15;
+  --bg:#0B0B0B;
+  --surface:#141416;
+  --surface2:#0e0e10;
+  --border:#2a2a2e;
+  --text:#F0F0F0;
+  --text-mid:rgba(240,240,240,.5);
+  --text-lo:rgba(240,240,240,.25);
+  --font:'Roboto Mono',monospace;
+  --head:'Archivo Black',sans-serif;
+  --ease:cubic-bezier(.4,0,.2,1);
+  --bounce:cubic-bezier(.22,.68,0,1.2);
+  --topbar-h:68px;
+  --tabs-h:44px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;touch-action:manipulation}
+
+/* TOP BAR */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;height:var(--topbar-h);
+  background:var(--surface2);
+  border-bottom:1px solid var(--border);
+  position:fixed;top:0;left:0;right:0;z-index:100;
+}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand-name{font-family:var(--head);font-size:.9rem;color:var(--blue);letter-spacing:.1em;text-transform:uppercase}
+.brand-sub{font-size:.55rem;color:var(--text-lo);letter-spacing:.15em;text-transform:uppercase}
+
+.counter-badge{
+  display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+  background:var(--blue-dim);border:1px solid var(--blue-border);
+  padding:8px 12px;min-width:100px;
+}
+.counter-label{font-size:.5rem;color:rgba(169,209,234,.55);letter-spacing:.16em;text-transform:uppercase}
+.counter-val{font-family:var(--head);font-size:1.2rem;color:var(--blue);line-height:1;letter-spacing:.04em}
+.counter-val span{font-size:.7rem;color:var(--text-mid);font-family:var(--font)}
+.sync-time{font-size:.48rem;color:var(--text-lo);letter-spacing:.1em;text-transform:uppercase;margin-top:1px;text-align:right}
+
+/* TABS */
+.tabs{
+  display:flex;position:fixed;
+  top:var(--topbar-h);left:0;right:0;z-index:99;
+  background:var(--surface2);
+  border-bottom:1px solid var(--border);
+  height:var(--tabs-h);
+}
+.tab{
+  flex:1;height:100%;
+  font-family:var(--font);font-size:.65rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-lo);background:transparent;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:color .2s,border-color .2s,background .2s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--blue-dim)}
+
+/* PANES */
+.pane{
+  position:fixed;
+  top:calc(var(--topbar-h) + var(--tabs-h));
+  left:0;right:0;bottom:0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  display:none;
+}
+.pane.active{display:block}
+
+/* SCANNER PANE */
+#pane-scanner{
+  display:none;flex-direction:column;align-items:center;
+  padding:14px 14px 90px;gap:10px;
+}
+#pane-scanner.active{display:flex}
+
+/* Camera frame */
+.scan-frame{
+  width:100%;max-width:320px;
+  border:2px solid var(--blue);
+  position:relative;overflow:hidden;
+  background:#000;flex-shrink:0;
+}
+.scan-corner{position:absolute;width:20px;height:20px;z-index:5;pointer-events:none}
+.sc-tl{top:6px;left:6px;border-top:2px solid var(--blue);border-left:2px solid var(--blue)}
+.sc-tr{top:6px;right:6px;border-top:2px solid var(--blue);border-right:2px solid var(--blue)}
+.sc-bl{bottom:6px;left:6px;border-bottom:2px solid var(--blue);border-left:2px solid var(--blue)}
+.sc-br{bottom:6px;right:6px;border-bottom:2px solid var(--blue);border-right:2px solid var(--blue)}
+#reader{width:100%;background:#000}
+.scan-line{
+  position:absolute;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--blue),transparent);
+  animation:scanmove 2s ease-in-out infinite;
+  z-index:4;pointer-events:none;display:none;
+}
+@keyframes scanmove{0%{top:8%}100%{top:90%}}
+
+/* Camera button */
+.btn-cam{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;max-width:320px;
+  background:transparent;border:1px solid var(--blue-border);
+  padding:10px;color:var(--blue);
+  font-family:var(--font);font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.btn-cam:hover,.btn-cam.active{background:var(--blue-dim);border-color:var(--blue)}
+.cam-dot{width:8px;height:8px;border-radius:50%;background:var(--text-lo);transition:background .3s}
+.btn-cam.active .cam-dot{background:#f87171;animation:blink 1.2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Cooldown bar */
+.cooldown-bar{width:100%;max-width:320px;height:2px;background:var(--border);overflow:hidden;flex-shrink:0}
+.cooldown-fill{height:100%;background:var(--blue);width:0%;transition:width .05s linear}
+
+/* Status card */
+.status-card{
+  width:100%;max-width:320px;
+  padding:14px 16px;border:1px solid var(--border);
+  background:var(--surface);min-height:76px;
+  transition:border-color .25s,background .25s;flex-shrink:0;
+}
+.status-card.ok{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.05)}
+.status-card.err{border-color:rgba(244,184,184,.4);background:rgba(244,184,184,.05)}
+.status-card.warn{border-color:rgba(250,204,21,.4);background:rgba(250,204,21,.05)}
+.status-idle{color:var(--text-lo);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:6px 0}
+.status-name{font-family:var(--head);font-size:1rem;color:var(--text);margin-bottom:3px;text-transform:uppercase}
+.status-email{font-size:.65rem;color:var(--text-mid);margin-bottom:8px;word-break:break-all}
+.status-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border:1px solid;
+}
+.status-badge.ok{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.3);color:var(--green)}
+.status-badge.err{background:rgba(244,184,184,.08);border-color:rgba(244,184,184,.3);color:var(--peach)}
+.status-badge.warn{background:rgba(250,204,21,.08);border-color:rgba(250,204,21,.3);color:var(--yellow)}
+.status-meta{font-size:.62rem;color:var(--text-lo);margin-top:6px;letter-spacing:.04em}
+
+/* Inline group quantity picker */
+.qty-picker{
+  width:100%;max-width:320px;
+  background:var(--surface);border:1px solid rgba(250,204,21,.35);
+  padding:12px 14px;display:none;flex-shrink:0;
+}
+.qty-picker.visible{display:block}
+.qty-label{font-size:.62rem;color:var(--yellow);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.qty-name{font-family:var(--head);font-size:.82rem;color:var(--text);margin-bottom:10px}
+.qty-row{display:flex;align-items:center;gap:10px}
+.qty-btn{
+  width:36px;height:36px;background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;flex-shrink:0;font-family:var(--font);
+}
+.qty-btn:hover{background:rgba(169,209,234,.1)}
+.qty-num{font-family:var(--head);font-size:1.4rem;color:var(--blue);min-width:32px;text-align:center}
+.qty-of{font-size:.62rem;color:var(--text-lo);letter-spacing:.06em}
+.qty-confirm{
+  flex:1;background:var(--blue);color:#000;border:none;
+  padding:10px;font-family:var(--head);font-size:.72rem;font-weight:900;
+  letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  transition:background .2s;
+}
+.qty-confirm:hover{background:#8ec8e6}
+.qty-cancel{
+  padding:10px;background:transparent;border:1px solid var(--border);
+  color:var(--text-mid);font-family:var(--font);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;transition:background .15s;white-space:nowrap;
+}
+.qty-cancel:hover{background:var(--surface2)}
+
+/* Manual input */
+.manual-wrap{width:100%;max-width:320px;display:flex;gap:8px;flex-shrink:0}
+.manual-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  padding:10px 12px;color:var(--text);font-family:var(--font);font-size:.78rem;
+  outline:none;transition:border-color .2s;min-width:0;
+}
+.manual-input:focus{border-color:var(--blue)}
+.manual-input::placeholder{color:var(--text-lo)}
+.btn-manual{
+  background:var(--blue);color:#000;border:none;
+  padding:10px 14px;font-family:var(--head);font-size:.72rem;font-weight:900;
+  letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
+  transition:background .2s;white-space:nowrap;flex-shrink:0;
+}
+.btn-manual:hover{background:#8ec8e6}
+
+/* ROSTER PANE */
+#pane-roster{padding:10px 10px 80px}
+
+.roster-search-wrap{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border);
+  padding:10px 12px;margin-bottom:10px;
+  position:sticky;top:0;z-index:10;
+}
+.roster-search-wrap input{
+  flex:1;background:transparent;border:none;outline:none;
+  font-family:var(--font);font-size:.78rem;color:var(--text);
+}
+.roster-search-wrap input::placeholder{color:var(--text-lo)}
+
+.roster-stats{display:flex;gap:6px;margin-bottom:10px}
+.roster-stat{
+  flex:1;background:var(--surface);border:1px solid var(--border);
+  border-top:2px solid var(--blue);padding:8px 10px;
+  font-size:.58rem;color:var(--text-lo);letter-spacing:.08em;text-transform:uppercase;
+}
+.roster-stat strong{display:block;font-family:var(--head);font-size:1rem;color:var(--blue);margin-bottom:1px}
+
+.roster-empty{text-align:center;padding:40px;color:var(--text-lo);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
+.roster-loading{text-align:center;padding:30px;color:var(--text-lo);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase}
+
+.attendee-row{
+  background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid var(--border);
+  padding:10px 12px;margin-bottom:5px;
+  display:flex;align-items:center;gap:10px;
+  transition:border-left-color .2s;
+}
+.attendee-row.checked-in{border-left-color:var(--green)}
+.attendee-row.partial{border-left-color:var(--yellow)}
+.attendee-info{flex:1;min-width:0}
+.attendee-name{font-family:var(--head);font-size:.82rem;color:var(--text);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attendee-email{font-size:.6rem;color:var(--text-lo);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.attendee-seats{font-size:.58rem;color:var(--text-mid);margin-top:2px;letter-spacing:.04em}
+.ci-tag{
+  white-space:nowrap;padding:4px 9px;flex-shrink:0;
+  font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid;
+}
+.ci-tag.full{color:var(--green);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.07)}
+.ci-tag.none{color:var(--blue);border-color:var(--blue-border);background:var(--blue-dim);cursor:pointer;transition:background .15s}
+.ci-tag.none:hover{background:rgba(169,209,234,.18)}
+.ci-tag.partial{color:var(--yellow);border-color:rgba(250,204,21,.25);background:rgba(250,204,21,.07);cursor:pointer}
+
+/* SETTINGS PANE */
+#pane-settings{padding:14px}
+.settings-label{font-size:.58rem;color:var(--text-lo);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.settings-input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  padding:10px 12px;color:var(--text);font-family:var(--font);font-size:.75rem;
+  outline:none;margin-bottom:8px;transition:border-color .2s;
+}
+.settings-input:focus{border-color:var(--blue)}
+.settings-input::placeholder{color:var(--text-lo)}
+.settings-row{display:flex;gap:8px;margin-bottom:6px}
+.btn-set{
+  flex:1;background:var(--blue);color:#000;border:none;
+  padding:10px;font-family:var(--head);font-size:.72rem;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  transition:background .2s;
+}
+.btn-set:hover{background:#8ec8e6}
+.btn-clear{
+  background:transparent;border:1px solid var(--border);
+  padding:10px 14px;color:var(--text-mid);
+  font-family:var(--font);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;transition:background .15s;white-space:nowrap;
+}
+.btn-clear:hover{background:rgba(244,184,184,.08);border-color:rgba(244,184,184,.3);color:var(--peach)}
+.webhook-status{margin-top:10px;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-lo)}
+
+.settings-divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.settings-info{font-size:.6rem;color:var(--text-lo);line-height:1.7;letter-spacing:.04em}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--surface);border:1px solid var(--border);
+  padding:10px 20px;font-size:.72rem;color:var(--text);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);z-index:500;
+  transition:transform .3s var(--bounce),opacity .3s;opacity:0;
+  font-family:var(--font);letter-spacing:.06em;text-transform:uppercase;
+  max-width:calc(100vw - 32px);text-align:center;
+}
+.toast.on{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.ok{border-color:rgba(74,222,128,.35);color:var(--green)}
+.toast.err{border-color:rgba(244,184,184,.35);color:var(--peach)}
+.toast.warn{border-color:rgba(250,204,21,.35);color:var(--yellow)}
+
+/* LOADER */
+.loader{
+  position:fixed;inset:0;z-index:300;background:rgba(11,11,11,.8);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+}
+.loader.on{display:flex}
+.spin{width:32px;height:32px;border:2px solid rgba(169,209,234,.1);border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.loader-txt{font-size:.65rem;color:var(--text-lo);letter-spacing:.14em;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-name">🚪 Main Door</div>
+    <div class="brand-sub">Fitness x Worship · Check-In</div>
+  </div>
+  <div class="counter-badge">
+    <div class="counter-label">Checked In</div>
+    <div class="counter-val" id="counter-val">–&nbsp;<span id="counter-total">/ –</span></div>
+    <div class="sync-time" id="sync-time">not synced</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" id="tab-scanner" onclick="switchTab('scanner')">📷 Scan</button>
+  <button class="tab" id="tab-roster" onclick="switchTab('roster')">📋 Roster</button>
+  <button class="tab" id="tab-settings" onclick="switchTab('settings')">⚙️ Setup</button>
+</div>
+
+<!-- SCANNER PANE -->
+<div class="pane active" id="pane-scanner">
+  <div class="scan-frame" id="scan-frame">
+    <div id="reader"></div>
+    <div class="scan-line" id="scan-line"></div>
+    <div class="scan-corner sc-tl"></div>
+    <div class="scan-corner sc-tr"></div>
+    <div class="scan-corner sc-bl"></div>
+    <div class="scan-corner sc-br"></div>
+  </div>
+
+  <button class="btn-cam" id="btn-cam" onclick="toggleCamera()">
+    <span class="cam-dot" id="cam-dot"></span>
+    <span id="cam-label">Start Camera</span>
+  </button>
+
+  <div class="cooldown-bar"><div class="cooldown-fill" id="cooldown-fill"></div></div>
+
+  <div class="status-card" id="status-card">
+    <div class="status-idle">Point camera at QR code or enter email below</div>
+  </div>
+
+  <!-- Inline group quantity picker (replaces native prompt()) -->
+  <div class="qty-picker" id="qty-picker">
+    <div class="qty-label">Group Pass</div>
+    <div class="qty-name" id="qty-name">–</div>
+    <div class="qty-row">
+      <button class="qty-btn" onclick="changeQty(-1)">−</button>
+      <div class="qty-num" id="qty-num">1</div>
+      <div class="qty-of" id="qty-of">of – remaining</div>
+      <button class="qty-cancel" onclick="cancelQty()">Cancel</button>
+      <button class="qty-confirm" onclick="confirmQty()">Confirm →</button>
+    </div>
+  </div>
+
+  <div class="manual-wrap">
+    <input class="manual-input" type="email" id="manual-email" placeholder="Enter email to check in" autocomplete="off" autocapitalize="off" autocorrect="off">
+    <button class="btn-manual" onclick="manualCheckIn()">→</button>
+  </div>
+</div>
+
+<!-- ROSTER PANE -->
+<div class="pane" id="pane-roster">
+  <div class="roster-search-wrap">
+    <span style="font-size:14px;color:var(--text-lo)">🔍</span>
+    <input type="search" id="roster-search" placeholder="Search name or email…" oninput="filterRoster()" autocomplete="off" autocapitalize="off">
+  </div>
+  <div class="roster-stats">
+    <div class="roster-stat"><strong id="stat-total">–</strong>Registered</div>
+    <div class="roster-stat"><strong id="stat-checked">–</strong>Checked In</div>
+    <div class="roster-stat"><strong id="stat-pending">–</strong>Pending</div>
+  </div>
+  <div id="roster-list"><div class="roster-loading">Loading roster…</div></div>
+</div>
+
+<!-- SETTINGS PANE -->
+<div class="pane" id="pane-settings">
+  <div class="settings-label">Webhook URL (Google Apps Script)</div>
+  <input class="settings-input" type="url" id="webhook-url-input" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div class="settings-row">
+    <button class="btn-set" onclick="saveWebhook()">Save &amp; Test →</button>
+    <button class="btn-clear" onclick="clearWebhook()">Clear</button>
+  </div>
+  <div class="webhook-status" id="webhook-status"></div>
+
+  <hr class="settings-divider">
+  <div class="settings-label">Total Seats</div>
+  <input class="settings-input" type="number" id="seats-input" placeholder="100" min="1" style="margin-bottom:8px">
+  <button class="btn-set" onclick="saveSeats()" style="max-width:160px">Save Seats</button>
+
+  <hr class="settings-divider">
+  <div class="settings-info">
+    Roster syncs automatically every 30 seconds while connected.<br>
+    Check-ins are sent via POST to your Apps Script webhook.<br>
+    QR codes must encode a plain email address.
+  </div>
+</div>
+
+<!-- TOAST + LOADER -->
+<div class="toast" id="toast"></div>
+<div class="loader" id="loader"><div class="spin"></div><div class="loader-txt" id="loader-txt">Processing…</div></div>
+
+<script>
+/* CONFIG */
+var WEBHOOK_URL = localStorage.getItem('fxw_webhook') || '';
+var TOTAL_SEATS = parseInt(localStorage.getItem('fxw_seats') || '100', 10);
+var COOLDOWN_MS = 2200;
+
+/* STATE */
+var rosterData   = [];
+var scanCooldown = false;
+var cameraRunning = false;
+var html5QrCode  = null;
+var _toastTimer  = null;
+var _cooldownInterval = null;
+var _pollTimer   = null;
+var _pendingCheckIn = null; // { email, attendee, remaining }
+var _qtyValue = 1;
+
+/* INIT */
+window.addEventListener('DOMContentLoaded', function() {
+  if (WEBHOOK_URL) {
+    document.getElementById('webhook-url-input').value = WEBHOOK_URL;
+    loadRoster(true);
+    startPoll();
+  } else {
+    switchTab('settings');
+    toast('Configure your webhook URL to begin', 'warn');
+  }
+  if (localStorage.getItem('fxw_seats')) {
+    document.getElementById('seats-input').value = localStorage.getItem('fxw_seats');
+  }
+  updateCounterDisplay();
+});
+
+/* POLL */
+function startPoll() {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(function() { loadRoster(false); }, 30000);
+}
+function stopPoll() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+/* TAB SWITCHING */
+function switchTab(name) {
+  ['scanner','roster','settings'].forEach(function(t) {
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+    document.getElementById('pane-'+t).classList.toggle('active', t===name);
+  });
+  if (name === 'roster') filterRoster();
+  if (name !== 'scanner') safeStopCamera();
+}
+
+/* CAMERA */
+function toggleCamera() {
+  if (cameraRunning) safeStopCamera();
+  else startCamera();
+}
+
+function startCamera() {
+  if (!Html5Qrcode) { toast('QR library not loaded', 'err'); return; }
+  html5QrCode = new Html5Qrcode('reader');
+  Html5Qrcode.getCameras().then(function(devices) {
+    if (!devices || !devices.length) { toast('No camera found', 'err'); return; }
+    var cam = devices.find(function(d) { return /back|rear|environment/i.test(d.label); })
+              || devices[devices.length - 1];
+    return html5QrCode.start(
+      cam.id,
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      function(text) { onScanResult(text); },
+      function() {}
+    );
+  }).then(function() {
+    cameraRunning = true;
+    document.getElementById('cam-label').textContent = 'Stop Camera';
+    document.getElementById('btn-cam').classList.add('active');
+    document.getElementById('scan-line').style.display = 'block';
+  }).catch(function(err) {
+    var msg = String(err);
+    if (/denied|NotAllowed/i.test(msg)) toast('Camera access denied', 'err');
+    else toast('Camera error', 'err');
+    html5QrCode = null;
+  });
+}
+
+function safeStopCamera() {
+  if (!html5QrCode) {
+    cameraRunning = false;
+    setCamIdle();
+    return;
+  }
+  var ref = html5QrCode;
+  html5QrCode = null;
+  ref.stop().catch(function(){}).finally(function() {
+    cameraRunning = false;
+    setCamIdle();
+  });
+}
+
+function setCamIdle() {
+  document.getElementById('cam-label').textContent = 'Start Camera';
+  document.getElementById('btn-cam').classList.remove('active');
+  document.getElementById('scan-line').style.display = 'none';
+}
+
+/* QR SCAN */
+function onScanResult(rawText) {
+  if (scanCooldown) return;
+  var email = rawText.trim().toLowerCase();
+  if (!isValidEmail(email)) {
+    toast('Invalid QR – not an email address', 'err');
+    return;
+  }
+  startCooldown();
+  processCheckIn(email);
+}
+
+function startCooldown() {
+  scanCooldown = true;
+  var fill = document.getElementById('cooldown-fill');
+  var start = Date.now();
+  fill.style.width = '100%';
+  clearInterval(_cooldownInterval);
+  _cooldownInterval = setInterval(function() {
+    var elapsed = Date.now() - start;
+    var pct = Math.max(0, 100 - (elapsed / COOLDOWN_MS * 100));
+    fill.style.width = pct.toFixed(1) + '%';
+    if (elapsed >= COOLDOWN_MS) {
+      scanCooldown = false;
+      fill.style.width = '0%';
+      clearInterval(_cooldownInterval);
+    }
+  }, 50);
+}
+
+/* MANUAL CHECK-IN */
+function manualCheckIn() {
+  var email = document.getElementById('manual-email').value.trim().toLowerCase();
+  if (!email || !isValidEmail(email)) { toast('Enter a valid email address', 'err'); return; }
+  processCheckIn(email);
+  document.getElementById('manual-email').value = '';
+}
+document.getElementById('manual-email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') manualCheckIn();
+});
+
+/* CHECK-IN FLOW */
+function processCheckIn(email) {
+  if (!WEBHOOK_URL) { toast('No webhook configured', 'err'); return; }
+
+  var attendee = rosterData.find(function(a) { return a.email === email; });
+
+  if (!attendee) {
+    // Not in local roster – attempt direct check-in for 1 seat
+    sendCheckIn(email, 1);
+    return;
+  }
+
+  var remaining = attendee.totalSeats - attendee.checkedIn;
+
+  if (remaining <= 0) {
+    setStatusCard({
+      type: 'warn',
+      name: attendee.name, email: email,
+      badge: 'Already fully checked in', badgeType: 'warn',
+      meta: 'All ' + attendee.totalSeats + ' seat(s) already scanned.'
+    });
+    vibrate([100, 50, 100]);
+    return;
+  }
+
+  if (remaining === 1) {
+    sendCheckIn(email, 1);
+    return;
+  }
+
+  // Show inline group picker
+  _pendingCheckIn = { email: email, attendee: attendee, remaining: remaining };
+  _qtyValue = remaining;
+  document.getElementById('qty-name').textContent = attendee.name.toUpperCase();
+  document.getElementById('qty-num').textContent = remaining;
+  document.getElementById('qty-of').textContent = 'of ' + remaining + ' remaining';
+  document.getElementById('qty-picker').classList.add('visible');
+  document.getElementById('qty-confirm').focus();
+}
+
+function changeQty(delta) {
+  if (!_pendingCheckIn) return;
+  _qtyValue = Math.max(1, Math.min(_pendingCheckIn.remaining, _qtyValue + delta));
+  document.getElementById('qty-num').textContent = _qtyValue;
+}
+
+function cancelQty() {
+  _pendingCheckIn = null;
+  _qtyValue = 1;
+  document.getElementById('qty-picker').classList.remove('visible');
+}
+
+function confirmQty() {
+  if (!_pendingCheckIn) return;
+  var email = _pendingCheckIn.email;
+  var qty = _qtyValue;
+  cancelQty();
+  sendCheckIn(email, qty);
+}
+
+function sendCheckIn(email, quantity) {
+  setLoading(true, 'Checking in…');
+  apiPost({ action: 'checkIn', email: email, quantity: quantity }, function(res) {
+    setLoading(false);
+    if (res.success) {
+      setStatusCard({
+        type: 'ok',
+        name: res.name || email, email: email,
+        badge: 'Checked in  ' + res.checkedIn + ' / ' + res.totalSeats,
+        badgeType: 'ok',
+        meta: res.checkedIn < res.totalSeats
+          ? (res.totalSeats - res.checkedIn) + ' seat(s) still to check in'
+          : 'Full group checked in ✓'
+      });
+      toast('✓ ' + (res.name || email), 'ok');
+      vibrate([60]);
+      loadRoster(false);
+    } else {
+      setStatusCard({
+        type: 'err',
+        name: email, email: '',
+        badge: 'Rejected', badgeType: 'err',
+        meta: res.error || 'Check-in failed'
+      });
+      toast(res.error || 'Check-in failed', 'err');
+      vibrate([200]);
+    }
+  });
+}
+
+/* STATUS CARD */
+function setStatusCard(opts) {
+  var card = document.getElementById('status-card');
+  card.className = 'status-card ' + (opts.type || '');
+  card.innerHTML =
+    '<div class="status-name">' + esc(opts.name) + '</div>' +
+    (opts.email ? '<div class="status-email">' + esc(opts.email) + '</div>' : '') +
+    '<span class="status-badge ' + (opts.badgeType||'') + '">' + esc(opts.badge) + '</span>' +
+    (opts.meta ? '<div class="status-meta">' + esc(opts.meta) + '</div>' : '');
+}
+
+/* ROSTER */
+function loadRoster(showLoader) {
+  if (!WEBHOOK_URL) return;
+  if (showLoader) setLoading(true, 'Loading roster…');
+  apiPost({ action: 'getRoster' }, function(res) {
+    if (showLoader) setLoading(false);
+    if (!res.success) {
+      if (showLoader) toast('Failed to load roster', 'err');
+      return;
+    }
+    rosterData = res.roster || [];
+    var now = new Date();
+    document.getElementById('sync-time').textContent =
+      'synced ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+    updateCounterDisplay(res.totalCheckedIn);
+    updateStats(res);
+    filterRoster();
+  });
+}
+
+function updateCounterDisplay(checkedIn) {
+  var el = document.getElementById('counter-val');
+  var tot = document.getElementById('counter-total');
+  el.childNodes[0].nodeValue = (checkedIn !== undefined ? checkedIn : '–') + '\u00a0';
+  tot.textContent = '/ ' + TOTAL_SEATS;
+}
+
+function updateStats(res) {
+  var total   = rosterData.length;
+  var checked = rosterData.filter(function(a) { return a.checkedIn >= a.totalSeats; }).length;
+  document.getElementById('stat-total').textContent   = total;
+  document.getElementById('stat-checked').textContent = res.totalCheckedIn !== undefined ? res.totalCheckedIn : '–';
+  document.getElementById('stat-pending').textContent = Math.max(0, total - checked);
+}
+
+function filterRoster() {
+  var q = (document.getElementById('roster-search').value || '').toLowerCase().trim();
+  var filtered = q
+    ? rosterData.filter(function(a) {
+        return a.name.toLowerCase().indexOf(q) >= 0 || a.email.toLowerCase().indexOf(q) >= 0;
+      })
+    : rosterData;
+  renderRoster(filtered);
+}
+
+function renderRoster(list) {
+  var el = document.getElementById('roster-list');
+  if (!list || !list.length) {
+    el.innerHTML = '<div class="roster-empty">' +
+      (rosterData.length === 0 ? 'No data – check webhook in Setup' : 'No results') + '</div>';
+    return;
+  }
+  var sorted = list.slice().sort(function(a,b) {
+    return (a.checkedIn / a.totalSeats) - (b.checkedIn / b.totalSeats);
+  });
+  el.innerHTML = sorted.map(function(a) {
+    var full    = a.checkedIn >= a.totalSeats;
+    var partial = a.checkedIn > 0 && !full;
+    var rowClass = full ? 'attendee-row checked-in' : partial ? 'attendee-row partial' : 'attendee-row';
+    var tagClass = full ? 'ci-tag full' : partial ? 'ci-tag partial' : 'ci-tag none';
+    var tagText  = full ? 'Checked in' : partial ? a.checkedIn+'/'+a.totalSeats+' – Tap' : 'Check in';
+    var onclick  = full ? '' : ' onclick="rosterCheckIn(\'' + escAttr(a.email) + '\')"';
+    return '<div class="' + rowClass + '">'
+      + '<div class="attendee-info">'
+        + '<div class="attendee-name">' + esc(a.name) + '</div>'
+        + '<div class="attendee-email">' + esc(a.email) + '</div>'
+        + '<div class="attendee-seats">' + a.totalSeats + (a.totalSeats > 1 ? ' seats · Group pass' : ' seat') + '</div>'
+      + '</div>'
+      + '<span class="' + tagClass + '"' + onclick + '>' + tagText + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function rosterCheckIn(email) {
+  switchTab('scanner');
+  setTimeout(function() { processCheckIn(email); }, 120);
+}
+
+/* SETTINGS */
+function saveWebhook() {
+  var url = document.getElementById('webhook-url-input').value.trim();
+  if (!url) { toast('Enter a webhook URL', 'err'); return; }
+  WEBHOOK_URL = url;
+  localStorage.setItem('fxw_webhook', url);
+  var statusEl = document.getElementById('webhook-status');
+  statusEl.style.color = 'var(--text-lo)';
+  statusEl.textContent = 'Testing connection…';
+  apiPost({ action: 'getRoster' }, function(res) {
+    if (res.success) {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✓ Connected – ' + (res.roster || []).length + ' attendee(s)';
+      toast('Webhook connected!', 'ok');
+      rosterData = res.roster || [];
+      updateCounterDisplay(res.totalCheckedIn);
+      filterRoster();
+      startPoll();
+    } else {
+      statusEl.style.color = 'var(--peach)';
+      statusEl.textContent = '✗ ' + (res.error || 'Connection failed');
+      toast('Connection failed', 'err');
+    }
+  });
+}
+
+function clearWebhook() {
+  WEBHOOK_URL = '';
+  localStorage.removeItem('fxw_webhook');
+  document.getElementById('webhook-url-input').value = '';
+  document.getElementById('webhook-status').textContent = '';
+  stopPoll();
+  rosterData = [];
+  renderRoster([]);
+  updateCounterDisplay(undefined);
+  toast('Webhook cleared', 'warn');
+}
+
+function saveSeats() {
+  var val = parseInt(document.getElementById('seats-input').value, 10);
+  if (!val || val < 1) { toast('Enter a valid number', 'err'); return; }
+  TOTAL_SEATS = val;
+  localStorage.setItem('fxw_seats', String(val));
+  updateCounterDisplay();
+  toast('Seat count updated', 'ok');
+}
+
+/* API – POST only (no GET fallback which silently fails on CORS redirect) */
+function apiPost(body, cb) {
+  if (!WEBHOOK_URL) { cb({ success: false, error: 'No webhook URL' }); return; }
+  fetch(WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(body),
+    mode: 'cors'
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  })
+  .then(function(data) { cb(data); })
+  .catch(function(err) {
+    setLoading(false);
+    toast('Network error – check webhook & CORS', 'err');
+    cb({ success: false, error: String(err) });
+  });
+}
+
+/* HELPERS */
+function isValidEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+
+function vibrate(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch(e){}
+}
+
+function setLoading(on, msg) {
+  var el = document.getElementById('loader');
+  if (on) {
+    document.getElementById('loader-txt').textContent = msg || 'Processing…';
+    el.classList.add('on');
+  } else {
+    el.classList.remove('on');
+  }
+}
+
+function toast(msg, type) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.classList.add('on');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() { t.classList.remove('on'); }, 3400);
+}
+
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(str) {
+  return String(str || '').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
