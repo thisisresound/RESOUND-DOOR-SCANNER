@@ -642,7 +642,7 @@ function trackFlow(){flowData.push(Date.now());var co=Date.now()-600000;flowData
 
 function setCard(o){
   var c=document.getElementById('status-card');c.className='status-card '+(o.type||'');
-  c.innerHTML='<div class="s-name">'+esc(o.name)+'</div>'+(o.email?'<div class="s-email">'+esc(o.email)+'</div>':'')+'<span class="s-badge '+(o.bt||'")>'+esc(o.badge)+'</span>'+(o.meta?'<div class="s-meta">'+esc(o.meta)+'</div>':'')+(o.station?'<div class="s-stn">via '+esc(o.station)+'</div>':'');
+  c.innerHTML='<div class="s-name">'+esc(o.name)+'</div>'+(o.email?'<div class="s-email">'+esc(o.email)+'</div>':'')+'<span class="s-badge '+(o.bt||'')+'">'+esc(o.badge)+'</span>'+(o.meta?'<div class="s-meta">'+esc(o.meta)+'</div>':'')+(o.station?'<div class="s-stn">via '+esc(o.station)+'</div>':'');
 }
 
 function loadRoster(show){
