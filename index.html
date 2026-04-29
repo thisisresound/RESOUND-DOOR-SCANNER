@@ -652,6 +652,10 @@ function loadRoster(show){
     roster=(res.roster||[]).map(function(a){
       a.checkedIn=typeof a.checkedIn==='number'?a.checkedIn:(parseInt(a.checkedIn)||0);
       if(a.checkInStatus){var m=a.checkInStatus.match(/CHECKED IN:\s*(\d+)/);if(m)a.checkedIn=parseInt(m[1]);}
+      a.bananasGiven=typeof a.bananasGiven==='number'?a.bananasGiven:(parseInt(a.bananasGiven)||0);
+      if(a.bananaStatus){var bm=a.bananaStatus.match(/GIVEN:\s*(\d+)/);if(bm)a.bananasGiven=parseInt(bm[1]);}
+      a.mealsGiven=typeof a.mealsGiven==='number'?a.mealsGiven:(parseInt(a.mealsGiven)||0);
+      if(a.mealStatus){var mm=a.mealStatus.match(/GIVEN:\s*(\d+)/);if(mm)a.mealsGiven=parseInt(mm[1]);}
       a.seats=a.seats||(a.seatsRaw?a.seatsRaw.split(',').map(function(s){return s.trim();}):[]);
       a.members=a.members||buildMembers(a);return a;
     });
@@ -687,46 +691,57 @@ function updateStats(res){
 }
 
 /* STATS PANEL */
-function updateStatsPaneDoor(res){
-  var total=TOTAL,checked=res.totalCheckedIn||0,pct=total?Math.round((checked/total)*100):0;
-  document.getElementById('stats-door-pct').textContent=pct+'%';
-  document.getElementById('stats-door-bar').style.width=pct+'%';
-  document.getElementById('stats-door-in').textContent=checked;
-  document.getElementById('stats-door-pending').textContent=Math.max(0,(res.roster||[]).filter(function(a){return(a.checkedIn||0)<(a.totalSeats||1);}).length);
+function fillStatsPanel(res){
+  var total=TOTAL;
+  // Door
+  var doorIn=res.totalCheckedIn||0;
+  var doorPending=roster.reduce(function(s,a){return s+Math.max(0,(a.totalSeats||1)-(a.checkedIn||0));},0);
+  var doorPct=total?Math.round((doorIn/total)*100):0;
+  document.getElementById('stats-door-pct').textContent=doorPct+'%';
+  document.getElementById('stats-door-bar').style.width=doorPct+'%';
+  document.getElementById('stats-door-in').textContent=doorIn;
+  document.getElementById('stats-door-pending').textContent=doorPending;
   document.getElementById('stats-door-total').textContent=total;
+  // Banana
+  var bn=res.totalBananas||0,bnPending=roster.reduce(function(s,a){return s+Math.max(0,(a.totalSeats||1)-(a.bananasGiven||0));},0);
+  var bnPct=total?Math.round((bn/total)*100):0;
+  document.getElementById('stats-bn-pct').textContent=bnPct+'%';
+  document.getElementById('stats-bn-bar').style.width=bnPct+'%';
+  document.getElementById('stats-bn-given').textContent=bn;
+  document.getElementById('stats-bn-pending').textContent=bnPending;
+  document.getElementById('stats-bn-total').textContent=total;
+  // Meal
+  var ml=res.totalMeals||0,mlPending=roster.reduce(function(s,a){return s+Math.max(0,(a.totalSeats||1)-(a.mealsGiven||0));},0);
+  var mlPct=total?Math.round((ml/total)*100):0;
+  document.getElementById('stats-ml-pct').textContent=mlPct+'%';
+  document.getElementById('stats-ml-bar').style.width=mlPct+'%';
+  document.getElementById('stats-ml-given').textContent=ml;
+  document.getElementById('stats-ml-pending').textContent=mlPending;
+  document.getElementById('stats-ml-total').textContent=total;
+  // Flow
   document.getElementById('stats-flow-door').textContent=(flowData.length/10).toFixed(1)+'/min';
+  document.getElementById('stats-flow-bn').textContent='–/min';
+  document.getElementById('stats-flow-ml').textContent='–/min';
 }
+
+function updateStatsPaneDoor(res){fillStatsPanel(res);}
 
 function refreshStats(){
   if(!WH){toast('Configure webhook first','warn');return;}
   apiPost({action:'getRoster'},function(res){
     if(!res.success){toast('Stats refresh failed','err');return;}
-    var total=TOTAL,checked=res.totalCheckedIn||0,pct=total?Math.round((checked/total)*100):0;
-    document.getElementById('stats-door-pct').textContent=pct+'%';
-    document.getElementById('stats-door-bar').style.width=pct+'%';
-    document.getElementById('stats-door-in').textContent=checked;
-    document.getElementById('stats-door-pending').textContent=Math.max(0,(res.roster||[]).filter(function(a){return(a.checkedIn||0)<(a.totalSeats||1);}).length);
-    document.getElementById('stats-door-total').textContent=total;
-    // Banana stats
-    var bn=res.totalBananas||0,bnTotal=checked;
-    var bnPct=bnTotal?Math.round((bn/bnTotal)*100):0;
-    document.getElementById('stats-bn-pct').textContent=bnPct+'%';
-    document.getElementById('stats-bn-bar').style.width=bnPct+'%';
-    document.getElementById('stats-bn-given').textContent=bn;
-    document.getElementById('stats-bn-pending').textContent=Math.max(0,bnTotal-bn);
-    document.getElementById('stats-bn-total').textContent=bnTotal;
-    // Meal stats
-    var ml=res.totalMeals||0,mlTotal=checked;
-    var mlPct=mlTotal?Math.round((ml/mlTotal)*100):0;
-    document.getElementById('stats-ml-pct').textContent=mlPct+'%';
-    document.getElementById('stats-ml-bar').style.width=mlPct+'%';
-    document.getElementById('stats-ml-given').textContent=ml;
-    document.getElementById('stats-ml-pending').textContent=Math.max(0,mlTotal-ml);
-    document.getElementById('stats-ml-total').textContent=mlTotal;
-    // flow
-    document.getElementById('stats-flow-door').textContent=(flowData.length/10).toFixed(1)+'/min';
-    document.getElementById('stats-flow-bn').textContent='–/min';
-    document.getElementById('stats-flow-ml').textContent='–/min';
+    // Re-parse roster so pending counts reflect latest data
+    roster=(res.roster||[]).map(function(a){
+      a.checkedIn=typeof a.checkedIn==='number'?a.checkedIn:(parseInt(a.checkedIn)||0);
+      if(a.checkInStatus){var m=a.checkInStatus.match(/CHECKED IN:\s*(\d+)/);if(m)a.checkedIn=parseInt(m[1]);}
+      a.bananasGiven=typeof a.bananasGiven==='number'?a.bananasGiven:(parseInt(a.bananasGiven)||0);
+      if(a.bananaStatus){var bm=a.bananaStatus.match(/GIVEN:\s*(\d+)/);if(bm)a.bananasGiven=parseInt(bm[1]);}
+      a.mealsGiven=typeof a.mealsGiven==='number'?a.mealsGiven:(parseInt(a.mealsGiven)||0);
+      if(a.mealStatus){var mm=a.mealStatus.match(/GIVEN:\s*(\d+)/);if(mm)a.mealsGiven=parseInt(mm[1]);}
+      return a;
+    });
+    var computedTotal=roster.reduce(function(s,a){return s+(a.totalSeats||1);},0)||TOTAL;TOTAL=computedTotal;
+    fillStatsPanel(res);
     var now=new Date();
     document.getElementById('stats-last-refresh').textContent='Last refreshed '+now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
     toast('Stats updated','ok');
